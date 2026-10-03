@@ -2,7 +2,7 @@ import { APP_URL } from "./supabase";
 
 /** What gets encoded into the QR image shown on the projector. */
 export function buildQrPayload(token: string): string {
-  return `${APP_URL}/scan/${token}`;
+  return `${APP_URL}/student/scan/${token}`;
 }
 
 /**

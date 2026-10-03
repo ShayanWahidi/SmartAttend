@@ -50,6 +50,15 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          {/* Alias: short /scan/:token links from previously generated QR codes */}
+          <Route
+            path="/scan/:token"
+            element={
+              <ProtectedRoute roles={["student"]}>
+                <ScanPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/student/history"
             element={
