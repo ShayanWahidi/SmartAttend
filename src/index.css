@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #d9e6ff;
+  --color-brand-200: #bcd3ff;
+  --color-brand-300: #8eb6ff;
+  --color-brand-400: #598eff;
+  --color-brand-500: #3366ff;
+  --color-brand-600: #1f45f5;
+  --color-brand-700: #1a34e1;
+  --color-brand-800: #1c2db6;
+  --color-brand-900: #1c2c8f;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-100 text-slate-900 antialiased;
+}
+
+/* Small helper used by the attendance ring */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
