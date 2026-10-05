@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -9,14 +10,26 @@ import HistoryPage from "@/pages/student/HistoryPage";
 import TeacherDashboard from "@/pages/teacher/TeacherDashboard";
 import SessionPage from "@/pages/teacher/SessionPage";
 import RecordsPage from "@/pages/teacher/RecordsPage";
+import AdminOverview from "@/pages/admin/AdminOverview";
+import TeachersPage from "@/pages/admin/TeachersPage";
+import StudentsPage from "@/pages/admin/StudentsPage";
+import SubjectsPage from "@/pages/admin/SubjectsPage";
+import UsersPage from "@/pages/admin/UsersPage";
 
 /** Sends each role to its own home page (PRD §7.1 role-based access). */
 function RoleHome() {
   const { session, profile, loading } = useAuth();
   if (loading) return <Loader label="Loading SmartAttend…" />;
   if (!session) return <Navigate to="/login" replace />;
-  return <Navigate to={profile?.role === "teacher" || profile?.role === "admin" ? "/teacher" : "/student"} replace />;
+  const home =
+    profile?.role === "admin" ? "/admin" : profile?.role === "teacher" ? "/teacher" : "/student";
+  return <Navigate to={home} replace />;
 }
+
+/** Admin routes share one guard. */
+const withAdmin = (page: ReactNode) => (
+  <ProtectedRoute roles={["admin"]}>{page}</ProtectedRoute>
+);
 
 export default function App() {
   return (
@@ -92,6 +105,12 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route path="/admin" element={withAdmin(<AdminOverview />)} />
+          <Route path="/admin/teachers" element={withAdmin(<TeachersPage />)} />
+          <Route path="/admin/students" element={withAdmin(<StudentsPage />)} />
+          <Route path="/admin/subjects" element={withAdmin(<SubjectsPage />)} />
+          <Route path="/admin/users" element={withAdmin(<UsersPage />)} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

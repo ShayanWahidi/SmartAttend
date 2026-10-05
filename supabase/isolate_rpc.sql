@@ -1,5 +1,5 @@
 -- =============================================================================
--- SmartAttend — isolation test: is the problem Postgres or PostgREST?
+-- SmartAttend - isolation test: is the problem Postgres or PostgREST?
 -- =============================================================================
 -- Run in Supabase SQL Editor. Copy me the FULL output.
 --
@@ -18,8 +18,8 @@ select n.nspname                                as schema,
        pg_get_userbyid(p.proowner)              as owner,
        p.proacl                                 as acl,           -- null = default privileges
        array_to_string(p.proconfig, ', ')        as config
-from pg_proc p
-join pg_namespace n on p.pronamespace = n.oid
+from pg_catalog.pg_proc p
+join pg_catalog.pg_namespace n on p.pronamespace = n.oid
 where p.proname ilike '%attendance%'
 order by n.nspname, p.proname, args;
 
@@ -34,20 +34,20 @@ select current_database()      as database,
 -- STEP 1c. Does a same-named function exist in ANOTHER schema?
 --           Two exposed schemas both containing the name = ambiguous lookup.
 select n.nspname, p.proname, pg_get_function_identity_arguments(p.oid) as args
-from pg_proc p
-join pg_namespace n on p.pronamespace = n.oid
+from pg_catalog.pg_proc p
+join pg_catalog.pg_namespace n on p.pronamespace = n.oid
 where p.proname = 'start_attendance_session';
 
 -- STEP 1d. Do the tables the app depends on exist in THIS database?
 select tablename, rowsecurity as rls_on
-from pg_tables where schemaname = 'public' order by tablename;
+from pg_catalog.pg_tables where schemaname = 'public' order by tablename;
 
 -- =============================================================================
 -- STEP 2. Direct call, no PostgREST. Replace the two values below.
 --   subject uuid : from  select id, code from public.subjects where code='CS302';
 --   teacher uuid : from  select id from public.teachers limit 1;
 -- Because this runs in the SQL editor, auth.uid() is NULL, so the function will
--- stop at the first check and raise 'not_a_teacher'. THAT IS A SUCCESSFUL CALL —
+-- stop at the first check and raise 'not_a_teacher'. THAT IS A SUCCESSFUL CALL -
 -- it proves the function exists and is being invoked correctly.
 -- =============================================================================
 select public.start_attendance_session(
@@ -61,7 +61,7 @@ select public.start_attendance_session(
 -- STEP 1a returns NO ROWS
 --   -> the function is not in this database. Nothing about the frontend or the
 --      RPC call can work until it is. Re-run repair_rpcs.sql and check for a
---      RED error in the SQL Editor panel (scroll up — the error is often at the
+--      RED error in the SQL Editor panel (scroll up - the error is often at the
 --      bottom of a long script).
 --
 -- STEP 1a shows schema <> 'public'

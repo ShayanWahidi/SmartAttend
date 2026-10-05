@@ -17,7 +17,8 @@ export default function Login() {
   const [notice, setNotice] = useState<string | null>(null);
 
   if (session) {
-    const home = profile?.role === "teacher" || profile?.role === "admin" ? "/teacher" : "/student";
+    const home =
+      profile?.role === "admin" ? "/admin" : profile?.role === "teacher" ? "/teacher" : "/student";
     return <Navigate to={home} replace />;
   }
 
@@ -192,7 +193,7 @@ export default function Login() {
 
           <p className="mt-6 rounded-xl bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-500">
             Your role (student or teacher) is decided by the database from your registered email — signing
-            up cannot grant teacher access.
+            up cannot grant teacher or admin access.
           </p>
         </div>
       </div>

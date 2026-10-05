@@ -257,7 +257,13 @@ create or replace function public.start_attendance_session(
   p_duration_seconds  integer default 120
 )
 returns public.attendance_sessions
-language plpgsql security definer set search_path = public
+language plpgsql
+-- `extensions` is required: gen_random_bytes() ships with pgcrypto, which
+-- Supabase installs into the `extensions` schema, not `public`. Without it,
+-- every call raises 42883 "function gen_random_bytes(integer) does not exist".
+-- (gen_random_uuid() is different — it is in pg_catalog, so the table defaults
+-- work without this.)
+security definer set search_path = public, extensions
 as $$
 declare
   v_duration integer := greatest(30, least(coalesce(p_duration_seconds, 120), 3600));
@@ -630,3 +636,102 @@ create trigger on_auth_user_created
 do $$ begin
   alter publication supabase_realtime add table public.attendance;
 exception when duplicate_object then null; end $$;
+
+-- -----------------------------------------------------------------------------
+-- 15. Admin console — the portal manages the directory through these policies.
+--     (supabase/admin.sql contains the same statements for existing databases.)
+-- -----------------------------------------------------------------------------
+
+-- Teachers: read is already open to any signed-in user; writes are admin only.
+drop policy if exists teachers_admin_insert on public.teachers;
+create policy teachers_admin_insert on public.teachers
+  for insert to authenticated with check (public.is_admin());
+drop policy if exists teachers_admin_update on public.teachers;
+create policy teachers_admin_update on public.teachers
+  for update to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+drop policy if exists teachers_admin_delete on public.teachers;
+create policy teachers_admin_delete on public.teachers
+  for delete to authenticated using (public.is_admin());
+
+-- Students: admin may add/edit/remove students.
+drop policy if exists students_admin_insert on public.students;
+create policy students_admin_insert on public.students
+  for insert to authenticated with check (public.is_admin());
+drop policy if exists students_admin_update on public.students;
+create policy students_admin_update on public.students
+  for update to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+drop policy if exists students_admin_delete on public.students;
+create policy students_admin_delete on public.students
+  for delete to authenticated using (public.is_admin());
+
+-- Subjects: an admin may create any subject and reassign its teacher.
+-- The teacher-owned policies above stay in place — permissive policies are OR'd.
+drop policy if exists subjects_admin_insert on public.subjects;
+create policy subjects_admin_insert on public.subjects
+  for insert to authenticated with check (public.is_admin());
+drop policy if exists subjects_admin_update on public.subjects;
+create policy subjects_admin_update on public.subjects
+  for update to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+-- Profiles: an admin may list every account and change a role.
+drop policy if exists profiles_admin_select on public.profiles;
+create policy profiles_admin_select on public.profiles
+  for select to authenticated using (public.is_admin());
+drop policy if exists profiles_admin_update on public.profiles;
+create policy profiles_admin_update on public.profiles
+  for update to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+-- Grants: Postgres checks table privileges before policies, so both are needed.
+grant insert, update, delete on public.teachers, public.students to authenticated;
+grant insert, update, delete on public.subjects    to authenticated;
+grant insert, delete         on public.enrollments to authenticated;
+grant update                 on public.profiles    to authenticated;
+
+-- Links a teacher/student record to a login that already exists, so the portal
+-- works whether the person signs up before or after being added. Never demotes
+-- an existing admin. Returns NULL when the person has not signed up yet — the
+-- handle_new_auth_user trigger links them at that point.
+create or replace function public.admin_sync_user(
+  p_email     text,
+  p_role      public.app_role,
+  p_full_name text
+)
+returns uuid
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_id uuid;
+begin
+  if not public.is_admin() then
+    raise exception 'not_authorised' using hint = 'Only admins can manage accounts.';
+  end if;
+  if p_role not in ('student', 'teacher') then
+    raise exception 'bad_role' using hint = 'Use the Users tab to grant the admin role.';
+  end if;
+
+  select id into v_id from auth.users where lower(email) = lower(trim(p_email));
+  if v_id is null then
+    return null;
+  end if;
+
+  insert into public.profiles (id, role, full_name)
+  values (v_id, p_role, coalesce(nullif(trim(p_full_name), ''), split_part(p_email, '@', 1)))
+  on conflict (id) do update
+    set role      = case when public.profiles.role = 'admin' then 'admin' else excluded.role end,
+        full_name = excluded.full_name;
+
+  update public.students set auth_id = v_id
+   where lower(email) = lower(trim(p_email)) and auth_id is distinct from v_id;
+  update public.teachers set auth_id = v_id
+   where lower(email) = lower(trim(p_email)) and auth_id is distinct from v_id;
+
+  return v_id;
+end;
+$$;
+
+revoke all on function public.admin_sync_user(text, public.app_role, text) from public;
+grant execute on function public.admin_sync_user(text, public.app_role, text) to authenticated;

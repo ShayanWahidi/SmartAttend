@@ -117,9 +117,32 @@ src/
   pages/Login.tsx              login + first-time signup
   pages/student/               Dashboard, ScanPage, HistoryPage
   pages/teacher/               Dashboard, SessionPage (projector), RecordsPage
-supabase/schema.sql            tables, RLS, RPCs, triggers, realtime
+  pages/admin/                 Overview, Teachers, Students, Subjects, Users
+supabase/schema.sql            tables, RLS, RPCs, triggers, realtime, admin policies
+supabase/admin.sql             admin-only migration (policies, grants, admin_sync_user)
 supabase/seed.sql              demo teachers/students/subjects/enrollments
 ```
+
+### Admin console (no SQL needed after the first admin exists)
+
+Run `supabase/admin.sql` once, then use `/admin` to manage everything:
+
+| Tab | What it does |
+|---|---|
+| Overview | Counts of teachers, students, subjects, enrollments + link status |
+| Teachers | Add/edit/remove faculty; shows how many subjects each teaches |
+| Students | Add/edit/remove students, search by name/roll no/email |
+| Subjects | Create subjects, assign the teacher, edit each class list |
+| Users | Every account that has signed in, with role change buttons |
+
+Add people here **before** they sign up. The email you type is the link between
+the record and their login: `handle_new_auth_user` assigns the role on signup,
+and the `admin_sync_user` RPC links accounts that already existed. No
+`service_role` key is ever used in the browser, and the portal cannot grant
+admin — the first admin is promoted once via SQL (see `supabase/admin.sql`).
+
+Deleting a student is refused if they have attendance records, since those rows
+cascade. Deleting a subject deletes its sessions and attendance records.
 
 ### The validation flow (PRD §9) lives in the database, not the browser
 
@@ -169,6 +192,9 @@ on `attendance`, plus `on conflict do nothing` inside the RPC.
    "Attendance session is closed."
 8. Student **Dashboard** shows the updated percentage; **History** shows the row.
 9. Teacher **Records** shows the roster for the session and exports CSV.
+10. Log in as admin → `/admin` → add a teacher and a student → sign up as that
+    teacher with the same email → confirm the role and their subjects appear
+    without touching the SQL editor.
 
 ## 4. Useful Supabase checks
 

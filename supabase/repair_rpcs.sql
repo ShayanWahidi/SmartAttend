@@ -65,7 +65,11 @@ create or replace function public.start_attendance_session(
   p_duration_seconds  integer default 120
 )
 returns public.attendance_sessions
-language plpgsql security definer set search_path = public
+language plpgsql
+-- `extensions` is required: gen_random_bytes() ships with pgcrypto, which
+-- Supabase installs into the `extensions` schema, not `public`. Without it,
+-- every call raises 42883 "function gen_random_bytes(integer) does not exist".
+security definer set search_path = public, extensions
 as $$
 declare
   v_duration integer := greatest(30, least(coalesce(p_duration_seconds, 120), 3600));

@@ -1,5 +1,5 @@
 -- =============================================================================
--- SmartAttend — diagnostic queries for RPC resolution failures
+-- SmartAttend - diagnostic queries for RPC resolution failures
 -- =============================================================================
 -- Paste into Supabase Dashboard > SQL Editor > New query > Run, then read the
 -- "How to read this" notes at the bottom.
@@ -11,8 +11,8 @@ select p.proname                                            as function_name,
        n.nspname                                            as schema,
        pg_get_function_identity_arguments(p.oid)           as arguments,
        pg_get_function_result(p.oid)                        as return_type
-from pg_proc p
-join pg_namespace n on p.pronamespace = n.oid
+from pg_catalog.pg_proc p
+join pg_catalog.pg_namespace n on p.pronamespace = n.oid
 where p.proname ilike '%attendance%'
 order by p.proname;
 
@@ -26,20 +26,20 @@ select current_setting('pgrst.db_schemas')           as exposed_schemas,
 
 -- 4. Do the tables exist, and is RLS on?
 select tablename, rowsecurity
-from pg_tables
+from pg_catalog.pg_tables
 where schemaname = 'public'
 order by tablename;
 
 -- 5. Is subjects.id a uuid? (the app sends subjects.id as p_subject_id)
 select column_name, data_type, udt_name
-from information_schema.columns
+from pg_catalog.information_schema.columns
 where table_schema = 'public' and table_name = 'subjects'
 order by ordinal_position;
 
 -- 6. Every RLS policy currently installed, and which function each one calls.
 --    A policy that references a missing function is a sign of a half-applied run.
 select tablename, policyname, cmd, qual, with_check
-from pg_policies
+from pg_catalog.pg_policies
 where schemaname = 'public'
 order by tablename, policyname;
 
