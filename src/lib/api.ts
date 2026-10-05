@@ -21,10 +21,32 @@ export class AppError extends Error {
   }
 }
 
-function rethrow(error: { code?: string; message: string; hint?: string } | null, fallback: string) {
-  const code = error?.code ?? "error";
-  const message = error?.hint ? `${error.hint}` : (error?.message ?? fallback);
-  throw new AppError(code, message);
+/**
+ * Postgres errors arrive with `message` + `hint`:
+ *   - `raise exception 'session_already_active' using hint = 'An attendance
+ *      session is already running…'`  -> message is a bare code, hint is the
+ *      human-readable text.
+ *   - `function public.foo(uuid, bigint) does not exist`  -> message is the
+ *      real diagnostic (it names the types Postgres was given), hint is the
+ *      generic "add explicit type casts" boilerplate.
+ * So: use `hint` only when `message` is a bare code, and never drop the message,
+ * otherwise real server-side errors get replaced by useless boilerplate.
+ */
+function rethrow(
+  error: { code?: string; message?: string; hint?: string; details?: string } | null,
+  fallback: string,
+) {
+  if (!error) throw new AppError("error", fallback);
+
+  const message = (error.message ?? "").trim();
+  const hint = (error.hint ?? "").trim();
+
+  // A bare machine code (no spaces, no parentheses) is not useful to show.
+  const descriptive = /[\s(]/.test(message);
+  const primary = descriptive ? message : hint || message || fallback;
+  const secondary = descriptive && hint && hint !== message ? hint : "";
+
+  throw new AppError(error.code ?? "error", [primary, secondary].filter(Boolean).join(" — "));
 }
 
 /* ------------------------------------------------------------------ profile */
